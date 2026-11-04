@@ -22,7 +22,7 @@ Requirements: Node.js `>=20.19.0` and npm.
    cp backend/.env.example backend/.env
    ```
 
-2. Fill in `backend/.env` with an Atlas `MONGO_URI`, a random `JWT_SECRET` of at least 32 characters, and a valid owner setup username/email/password. Use a replica-set-capable MongoDB deployment: checkout reserves finite stock and writes orders in a MongoDB transaction.
+2. Fill in `backend/.env` with an Atlas `MONGO_URI`, a random `JWT_SECRET` of at least 32 characters, and a valid owner setup username/email/password. Use the Atlas **database user** (not your Atlas website login); the URI example includes `authSource=admin` while targeting the separate `velveteen` database. Use a replica-set-capable MongoDB deployment: checkout reserves finite stock and writes orders in a MongoDB transaction.
 
 3. Install backend dependencies and start the API in a terminal:
 
