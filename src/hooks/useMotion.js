@@ -1,7 +1,6 @@
 import { useLayoutEffect } from 'react';
-import { initMotion } from '../motion.js';
 
-export function useMotion(rootRef) {
+export function useMotion(rootRef, dependency = 0) {
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return undefined;
@@ -22,7 +21,12 @@ export function useMotion(rootRef) {
 
     const fontsReady = document.fonts?.ready?.catch(() => undefined) ?? Promise.resolve();
     fontsReady.then(() => {
-      if (active) stopMotion = initMotion(root);
+      if (!active) return;
+      import('../motion.js')
+        .then(({ initMotion }) => {
+          if (active) stopMotion = initMotion(root);
+        })
+        .catch((error) => console.error('Velveteen motion could not be initialized.', error));
     });
 
     return () => {
@@ -30,5 +34,5 @@ export function useMotion(rootRef) {
       openingObserver?.disconnect();
       stopMotion?.();
     };
-  }, [rootRef]);
+  }, [rootRef, dependency]);
 }

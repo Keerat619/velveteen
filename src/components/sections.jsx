@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { api, getApiError } from '../services/api.js';
+import { formatMoney } from '../utils/commerce.js';
 import {
   arrangements,
-  benchProducts,
   faqItems,
   keepsakeOptions,
   makingStages,
@@ -10,7 +12,6 @@ import {
   studioNotes,
   studioSessions,
 } from '../data/siteContent.js';
-import { CONTACT_EMAIL } from '../siteConfig.js';
 
 function ArrowGlyph() {
   return (
@@ -79,7 +80,14 @@ export function Opening({ onSelectProduct }) {
   );
 }
 
-export function Season({ onSelectProduct }) {
+export function Season({ products = [], loading = false, error = '', onAddToCart, onSelectProduct }) {
+  const [notice, setNotice] = useState('');
+
+  const addProduct = (product) => {
+    const result = onAddToCart(product);
+    setNotice(result.message || '');
+  };
+
   return (
     <section id="season" data-8b-section="season" aria-labelledby="season-title">
       <header className="bench__head">
@@ -89,22 +97,37 @@ export function Season({ onSelectProduct }) {
       </header>
       <div className="bench__frame">
         <div className="bench__deck">
-          {benchProducts.map((item) => (
-            <figure className="bench__ph" key={item.name}>
-              <img src={item.image} width="900" height="1200" alt={item.alt} loading="lazy" />
+          {products.map((product) => (
+            <figure className="bench__ph" key={product._id}>
+              <img src={product.image} width="900" height="1200" alt={`${product.name}, handmade pipe-cleaner flowers`} loading="lazy" />
             </figure>
           ))}
         </div>
       </div>
-      <ol className="bench__rows">
-        {benchProducts.map((item) => (
-          <li className="bench__row" key={item.name}>
-            <h3 className="bench__name m-text-4">{item.name}</h3>
-            <p className="m-text-8">{item.meta}</p>
-            <p className="bench__note m-text">{item.note}</p>
+      <ol className="bench__rows" aria-live="polite">
+        {loading && <li className="bench__row"><p className="m-text">Gathering the collection…</p></li>}
+        {!loading && error && <li className="bench__row"><p className="m-text" role="status">{error}</p></li>}
+        {!loading && !error && products.length === 0 && (
+          <li className="bench__row">
+            <h3 className="bench__name m-text-4">A little room on the bench</h3>
+            <p className="bench__note m-text">The next handmade pieces are being prepared. Send a custom request and tell us what you have in mind.</p>
+          </li>
+        )}
+        {products.map((product) => (
+          <li className="bench__row" key={product._id}>
+            <h3 className="bench__name m-text-4">{product.name}</h3>
+            <p className="m-text-8">{product.category.replaceAll('-', ' ')} · {product.availability === 'made-to-order' ? 'Made to order' : 'Available'}</p>
+            <p className="bench__note m-text">{product.description}</p>
+            <p className="bench__price m-text-4">{formatMoney(product.price, product.currency)}</p>
+            <div className="bench__actions">
+              <Link className="m-link" to={`/products/${product._id}`}>View details</Link>
+              <button className="m-link bench__add" type="button" onClick={() => addProduct(product)}>Add to bag</button>
+            </div>
           </li>
         ))}
       </ol>
+      {notice && <p className="bench__notice m-text-8" role="status">{notice}</p>}
+      <div className="bench__catalog-link"><Link className="m-link" to="/products">Browse the full collection</Link></div>
       <RowLink className="bench__more m-rowlink" onSelectProduct={onSelectProduct} motion={false}>
         Build a bouquet from the bench
       </RowLink>
@@ -348,82 +371,46 @@ export function Faq() {
   );
 }
 
-function makeEnquiryDraft(values) {
-  return [
-    'Hello Velveteen,',
-    '',
-    `I would love to ask about: ${values.product}`,
-    `Name: ${values.name}`,
-    `My contact: ${values.contact}`,
-    `For: ${values.date || 'No date chosen yet'}`,
-    `Size or scale: ${values.budget}`,
-    `Notes: ${values.note || 'I would like to discuss the details.'}`,
-  ].join('\n');
-}
-
-function makeMailtoUrl(message) {
-  const subject = encodeURIComponent('A handmade flower enquiry for Velveteen');
-  const body = encodeURIComponent(message);
-  const recipient = CONTACT_EMAIL ? encodeURIComponent(CONTACT_EMAIL) : '';
-  return `mailto:${recipient}?subject=${subject}&body=${body}`;
-}
-
-export function Contact({ selectedProduct, onSelectProduct }) {
-  const [product, setProduct] = useState(selectedProduct || 'Custom bouquet');
-  const [draft, setDraft] = useState('');
+export function Contact({ selectedProduct = 'Custom bouquet', onSelectProduct = () => {} }) {
+  const [flowerType, setFlowerType] = useState(selectedProduct);
   const [status, setStatus] = useState('');
-  const [copyLabel, setCopyLabel] = useState('Copy enquiry');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (selectedProduct) {
-      setProduct(selectedProduct);
-      setDraft('');
-      setStatus('');
-      setCopyLabel('Copy enquiry');
-    }
+    if (selectedProduct) setFlowerType(selectedProduct);
   }, [selectedProduct]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
-
     const formData = new FormData(form);
-    const values = {
-      name: String(formData.get('name') || '').trim(),
-      contact: String(formData.get('contact') || '').trim(),
-      product: String(formData.get('product') || product),
-      date: String(formData.get('date') || '').trim(),
-      budget: String(formData.get('budget') || 'Let’s decide together'),
-      note: String(formData.get('note') || '').trim(),
+    const payload = {
+      customerName: String(formData.get('customerName') || '').trim(),
+      email: String(formData.get('email') || '').trim(),
+      phone: String(formData.get('phone') || '').trim(),
+      flowerType: String(formData.get('flowerType') || flowerType).trim(),
+      preferredColours: String(formData.get('preferredColours') || '').trim(),
+      bouquetSize: String(formData.get('bouquetSize') || '').trim(),
+      budget: String(formData.get('budget') || '').trim(),
+      deliveryDate: String(formData.get('deliveryDate') || '').trim(),
+      customMessage: String(formData.get('customMessage') || '').trim(),
+      referenceImage: String(formData.get('referenceImage') || '').trim(),
     };
-    const message = makeEnquiryDraft(values);
-    setDraft(message);
-    setCopyLabel('Copy enquiry');
 
-    if (CONTACT_EMAIL) {
-      setStatus('Your email app is opening with a ready-to-send note for the studio.');
-      window.location.assign(makeMailtoUrl(message));
-      return;
-    }
-
+    setSubmitting(true);
+    setStatus('');
+    setError('');
     try {
-      await navigator.clipboard.writeText(message);
-      setStatus('Your enquiry has been copied. Paste it into a message to Velveteen.');
-      setCopyLabel('Copy again');
-    } catch {
-      setStatus('Your enquiry is ready below. Copy it and send it through your preferred contact channel.');
-    }
-  };
-
-  const copyDraft = async () => {
-    if (!draft) return;
-    try {
-      await navigator.clipboard.writeText(draft);
-      setCopyLabel('Copied');
-      setStatus('Your enquiry has been copied. Paste it into a message to Velveteen.');
-    } catch {
-      setCopyLabel('Select the note below to copy');
+      const { data } = await api.post('/custom-orders', payload);
+      setStatus(`${data.message} Request reference: ${String(data.request.id).slice(-8).toUpperCase()}.`);
+      form.reset();
+      setFlowerType(selectedProduct || 'Custom bouquet');
+    } catch (requestError) {
+      setError(getApiError(requestError, 'Your request could not be saved. Please try again.'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -434,25 +421,29 @@ export function Contact({ selectedProduct, onSelectProduct }) {
       </figure>
       <div className="ct__card m-surface">
         <div className="ct__top">
-          <p className="m-text-3">Order or ask</p>
+          <p className="m-text-3">A custom request</p>
           <h2 id="contact-title" className="m-text-2">Tell us who they’re for</h2>
-          <p className="m-text-8">No checkout here—each handmade piece is discussed with you before it is confirmed.</p>
+          <p className="m-text-8">Share a flower, palette, size and comfortable budget. The studio will review your request and confirm details before any order is placed.</p>
         </div>
-        <form id="contact-form" className="ct__form" action="#contact" method="post" onSubmit={handleSubmit}>
+        <form id="contact-form" className="ct__form" onSubmit={handleSubmit}>
           <label className="m-field">
             <span className="m-field__label">Your name</span>
-            <input className="m-field__input" name="name" type="text" autoComplete="name" required />
+            <input className="m-field__input" name="customerName" type="text" autoComplete="name" minLength="2" maxLength="120" required />
           </label>
           <label className="m-field">
-            <span className="m-field__label">Phone or email</span>
-            <input className="m-field__input" name="contact" type="text" autoComplete="email" required />
+            <span className="m-field__label">Email</span>
+            <input className="m-field__input" name="email" type="email" autoComplete="email" maxLength="254" required />
+          </label>
+          <label className="m-field">
+            <span className="m-field__label">Phone number</span>
+            <input className="m-field__input" name="phone" type="tel" autoComplete="tel" maxLength="32" required />
           </label>
           <label className="m-field">
             <span className="m-field__label">What are you dreaming of?</span>
-            <select className="m-field__input" name="product" value={product} onChange={(event) => { setProduct(event.target.value); onSelectProduct(event.target.value); }}>
+            <select className="m-field__input" name="flowerType" value={flowerType} onChange={(event) => { setFlowerType(event.target.value); onSelectProduct(event.target.value); }}>
               <option>Custom bouquet</option>
-              <option>Single handmade stem</option>
               <option>A little bunch</option>
+              <option>Single handmade stem</option>
               <option>Roses</option>
               <option>Tulips</option>
               <option>Sunflowers</option>
@@ -462,31 +453,40 @@ export function Contact({ selectedProduct, onSelectProduct }) {
             </select>
           </label>
           <label className="m-field">
-            <span className="m-field__label">A date, if there is one</span>
-            <input className="m-field__input" name="date" type="date" />
+            <span className="m-field__label">Preferred colours</span>
+            <input className="m-field__input" name="preferredColours" type="text" maxLength="480" placeholder="For example: blush, lilac, warm ivory" />
           </label>
           <label className="m-field">
-            <span className="m-field__label">Size or scale</span>
-            <select className="m-field__input" name="budget">
-              <option>Let’s decide together</option>
-              <option>One thoughtful stem</option>
+            <span className="m-field__label">Bouquet size</span>
+            <select className="m-field__input" name="bouquetSize" required>
+              <option value="">Choose a scale</option>
+              <option>One handmade stem</option>
               <option>A small bunch</option>
               <option>A full bouquet</option>
+              <option>A decorative or event piece</option>
             </select>
           </label>
-          <label className="m-field ct__wide">
-            <span className="m-field__label">Colours, flowers or details to know</span>
-            <textarea className="m-field__input" name="note" rows="3" />
+          <label className="m-field">
+            <span className="m-field__label">Budget or range</span>
+            <input className="m-field__input" name="budget" type="text" maxLength="120" placeholder="Share a range, or ask us to advise" required />
           </label>
-          <button className="m-btn" type="submit"><span className="m-btn__label">Prepare my enquiry</span></button>
+          <label className="m-field">
+            <span className="m-field__label">Preferred delivery date</span>
+            <input className="m-field__input" name="deliveryDate" type="date" />
+          </label>
+          <label className="m-field">
+            <span className="m-field__label">Reference image URL (optional)</span>
+            <input className="m-field__input" name="referenceImage" type="url" maxLength="2048" placeholder="https://…" />
+          </label>
+          <label className="m-field ct__wide">
+            <span className="m-field__label">A note about the person or occasion</span>
+            <textarea className="m-field__input" name="customMessage" rows="3" maxLength="1500" />
+          </label>
+          <button className="m-btn" type="submit" disabled={submitting}>
+            <span className="m-btn__label">{submitting ? 'Saving your request…' : 'Send a custom request'}</span>
+          </button>
           {status && <p className="ct__done m-text" role="status">{status}</p>}
-          {draft && (
-            <>
-              <button className="ct__copy m-link" type="button" onClick={copyDraft}>{copyLabel}</button>
-              <textarea className="ct__draft m-field__input ct__wide" value={draft} readOnly rows="5" aria-label="Your enquiry draft" />
-              {!CONTACT_EMAIL && <a className="m-link ct__email-draft" href={makeMailtoUrl(draft)}>Open an email draft</a>}
-            </>
-          )}
+          {error && <p className="ct__done m-text" role="alert">{error}</p>}
         </form>
         <dl className="ct__info">
           <div><dt className="m-text-3">The flowers</dt><dd className="m-text">Pipe-cleaner roses, tulips, sunflowers and more.</dd></div>

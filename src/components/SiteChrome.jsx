@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useCart } from '../context/CartContext.jsx';
 import { navItems } from '../data/siteContent.js';
 
 function ArrowIcon() {
@@ -18,10 +20,16 @@ function VelveteenMark() {
   );
 }
 
-export function Navigation({ onSelectProduct }) {
+function sectionHref(pathname, id) {
+  return pathname === '/' ? `#${id}` : `/#${id}`;
+}
+
+export function Navigation({ onSelectProduct = () => {} }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const openButtonRef = useRef(null);
   const closeButtonRef = useRef(null);
+  const { pathname } = useLocation();
+  const { itemCount } = useCart();
 
   useEffect(() => {
     const nav = document.getElementById('navigation');
@@ -69,21 +77,25 @@ export function Navigation({ onSelectProduct }) {
     onSelectProduct('Custom bouquet');
     closeMenu(false);
   };
+  const contactHref = sectionHref(pathname, 'contact');
 
   return (
     <header id="navigation" data-8b-section="navigation">
-      <a className="nav__brand" href="#opening" aria-label="Velveteen, to the top">
+      <a className="nav__brand" href={sectionHref(pathname, 'opening')} aria-label="Velveteen, to the top">
         <VelveteenMark />
         <span>VELVETEEN</span>
       </a>
       <nav className="nav__links" aria-label="Main">
         {navItems.map((item) => (
-          <a className="m-link-2" href={item.href} key={item.href}>
+          <a className="m-link-2" href={sectionHref(pathname, item.href.slice(1))} key={item.href}>
             {item.label}
           </a>
         ))}
       </nav>
-      <a className="nav__cta" href="#contact" onClick={() => onSelectProduct('Custom bouquet')}>
+      <Link className="nav__cart" to="/cart" aria-label={`Shopping bag, ${itemCount} items`}>
+        Bag <span className="nav__cart-count">{itemCount}</span>
+      </Link>
+      <a className="nav__cta" href={contactHref} onClick={() => onSelectProduct('Custom bouquet')}>
         Custom order <span className="m-icon"><ArrowIcon /></span>
       </a>
       <button
@@ -137,62 +149,68 @@ export function Navigation({ onSelectProduct }) {
         </div>
         <nav className="menu__links" aria-label="Menu">
           {navItems.map((item) => (
-            <a href={item.href} key={item.href} onClick={() => closeMenu(false)}>
+            <a href={sectionHref(pathname, item.href.slice(1))} key={item.href} onClick={() => closeMenu(false)}>
               {item.label}
             </a>
           ))}
-          <a href="#contact" onClick={handleOrderClick}>Custom order</a>
+          <Link to="/cart" onClick={() => closeMenu(false)}>Shopping bag ({itemCount})</Link>
+          <a href={contactHref} onClick={handleOrderClick}>Custom order</a>
         </nav>
         <div className="menu__foot">
           <p className="m-text-8">Handmade pipe-cleaner flowers and keepsakes<br />Custom requests are always welcome.</p>
-          <a className="m-link" href="#contact" onClick={handleOrderClick}>Ask the studio</a>
+          <a className="m-link" href={contactHref} onClick={handleOrderClick}>Ask the studio</a>
         </div>
       </div>
     </header>
   );
 }
 
-export function Footer({ onSelectProduct }) {
+export function Footer({ onSelectProduct = () => {} }) {
+  const { pathname } = useLocation();
+  const { itemCount } = useCart();
   const startCustomOrder = () => onSelectProduct('Custom bouquet');
+  const href = (id) => sectionHref(pathname, id);
 
   return (
     <footer id="footer" data-8b-section="footer">
-      <div className="ft__mark" aria-label="Velveteen wordmark">
-        <span className="ft__rect">VELV</span>
+      <div className="ft__mark" role="img" aria-label="Velveteen wordmark">
+        <span className="ft__rect" aria-hidden="true">VELV</span>
         <span className="ft__bar" aria-hidden="true" />
-        <span className="ft__dome">ETEEN</span>
+        <span className="ft__dome" aria-hidden="true">ETEEN</span>
       </div>
       <div className="ft__cols">
         <nav className="ft__col" aria-label="The collection">
           <p className="m-text-3">The collection</p>
-          <a className="m-link-2" href="#season">On the bench</a>
-          <a className="m-link-2" href="#work">Arrangements</a>
-          <a className="m-link-2" href="#dusk">Made by hand</a>
-          <a className="m-link-2" href="#standing">Ways to gift</a>
+          <a className="m-link-2" href={href('season')}>On the bench</a>
+          <Link className="m-link-2" to="/products">Shop the full collection</Link>
+          <a className="m-link-2" href={href('work')}>Arrangements</a>
+          <a className="m-link-2" href={href('dusk')}>Made by hand</a>
+          <a className="m-link-2" href={href('standing')}>Ways to gift</a>
         </nav>
         <nav className="ft__col" aria-label="For the moment">
           <p className="m-text-3">For the moment</p>
-          <a className="m-link-2" href="#events">Celebrations</a>
-          <a className="m-link-2" href="#school">Studio sessions</a>
-          <a className="m-link-2" href="#notes">A note from us</a>
-          <a className="m-link-2" href="#faq">Questions</a>
+          <a className="m-link-2" href={href('events')}>Celebrations</a>
+          <a className="m-link-2" href={href('school')}>Studio sessions</a>
+          <a className="m-link-2" href={href('notes')}>A note from us</a>
+          <a className="m-link-2" href={href('faq')}>Questions</a>
         </nav>
         <nav className="ft__col" aria-label="Make it yours">
           <p className="m-text-3">Make it yours</p>
-          <a className="m-link-2" href="#contact" onClick={startCustomOrder}>Custom bouquet</a>
-          <a className="m-link-2" href="#contact" onClick={() => onSelectProduct('Personalised handmade gift')}>Personalised gift</a>
-          <a className="m-link-2" href="#contact" onClick={() => onSelectProduct('Single handmade stem')}>A single stem</a>
-          <a className="m-link-2" href="#contact" onClick={() => onSelectProduct('Flower-making session')}>Ask about a session</a>
+          <a className="m-link-2" href={href('contact')} onClick={startCustomOrder}>Custom bouquet</a>
+          <a className="m-link-2" href={href('contact')} onClick={() => onSelectProduct('Personalised handmade gift')}>Personalised gift</a>
+          <a className="m-link-2" href={href('contact')} onClick={() => onSelectProduct('Single handmade stem')}>A single stem</a>
+          <a className="m-link-2" href={href('contact')} onClick={() => onSelectProduct('Flower-making session')}>Ask about a session</a>
         </nav>
         <div className="ft__col">
           <p className="m-text-3">The studio</p>
           <p>Small flowers, shaped by hand from soft chenille stems. Made to carry a little meaning and be kept close.</p>
-          <a className="m-link-2" href="#contact" onClick={startCustomOrder}>Start an enquiry</a>
+          <Link className="m-link-2" to="/cart">View your bag ({itemCount})</Link>
+          <a className="m-link-2" href={href('contact')} onClick={startCustomOrder}>Start an enquiry</a>
         </div>
       </div>
       <div className="ft__base m-text-8">
         <p>© 2026 VELVETEEN · Made by hand · Design: <a href="https://8b.com/" style={{ color: 'inherit' }} data-8b-credit>8B</a></p>
-        <a className="m-link-2" href="#opening">Back to the top</a>
+        <a className="m-link-2" href={href('opening')}>Back to the top</a>
       </div>
     </footer>
   );
